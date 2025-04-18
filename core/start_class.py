@@ -57,7 +57,7 @@ class BotClass:
             res = await get_stt(file_path)
             await update.message.reply_text(res)
             advice = await get_text(res, f'опыт: {user.experience}, специальность: {user.experience},'
-                                         f'место работы: {user.place}')
+                                         f'место работы: {user.place}', update)
             for i in range(0, len(advice), 2000):
                 await update.message.reply_text(advice[i:i + 2000])
             await update.message.reply_text('✅ Готово!', reply_markup=await self.menu())

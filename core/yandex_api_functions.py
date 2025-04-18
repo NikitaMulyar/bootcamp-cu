@@ -22,7 +22,7 @@ async def create_assistant():
 
     status = operation.get_status()
     while status.is_running:
-        await asyncio.sleep(3)
+        await asyncio.sleep(5)
         status = operation.get_status()
 
     text_index = operation.get_result()
@@ -108,7 +108,7 @@ async def get_stt(file_path):
     return 'ошибка'
 
 
-async def get_text(user_prompt, data, questions=False):
+async def get_text(user_prompt, data, update, questions=False):
     system_prompt = ('Ты - профессиональный спикер. Посмотри данный текст и дай рекомендации по его улучшению. '
                      'Пользователь - эскперт IT индустрии, но хочет начать преподавать. Ему надо дать советы по '
                      f'soft-skills и психологические советы. Информация о пользователе: {data}')
@@ -129,11 +129,12 @@ async def get_text(user_prompt, data, questions=False):
         temperature=0.4,
         max_tokens=4000,
     )
+    await update.message.reply_text('отправлено')
     operation = model.run_deferred(messages)
 
     status = operation.get_status()
     while status.is_running:
-        await asyncio.sleep(3)
+        await asyncio.sleep(5)
         status = operation.get_status()
 
     result = operation.get_result()
