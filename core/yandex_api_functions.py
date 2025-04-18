@@ -61,6 +61,7 @@ async def create(file_path):
     create_url = "https://api.speechflow.io/asr/file/v1/create"
     create_url += "?lang=" + 'ru'
     files['file'] = open(file_path, "rb")
+    # TODO: сделать STT асинхр.
     # async with aiohttp.ClientSession() as session:
     #     response = await session.post(create_url, headers=headers, files=files)
     response = requests.post(create_url, headers=headers, files=files)

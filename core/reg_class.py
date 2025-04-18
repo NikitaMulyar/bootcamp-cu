@@ -16,7 +16,7 @@ class RegClass:
 
     async def menu(self):
         classes = [[InlineKeyboardButton('🗳️ Получить совет', callback_data='advice')],
-                   [InlineKeyboardButton('🗂 Получить вопросы студентов для тренировки', callback_data='questions')],
+                   [InlineKeyboardButton('🗂 Получить вопросы для тренировки', callback_data='questions')],
                    [InlineKeyboardButton('🗃️ Анализировать речь', callback_data='speech')]]
         return InlineKeyboardMarkup(classes)
 
@@ -43,8 +43,19 @@ class RegClass:
         email = update.message.text
         try:
             email_validator.validate_email(email, check_deliverability=True)
+
+            session = await db_helper.get_session()
+            stmt = (select(User).where(User.email == email))
+            user_exists = (await session.execute(stmt)).scalar_one_or_none()
+
+            if user_exists:
+                await update.message.reply_text('⚠️ Данный адрес уже занят - попробуй еще разок!')
+                await session.close()
+                return self.state_email
+
             context.user_data['register']['email'] = email
             await update.message.reply_text('✅ Записал! Теперь напиши свои ФИО')
+            await session.close()
             return self.state_fio
         except email_validator.EmailNotValidError:
             await update.message.reply_text('⚠️ Некорректный адрес - попробуй еще разок!')
