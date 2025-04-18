@@ -1,0 +1,54 @@
+# docker-compose.yml
+version: '3.8' # Укажите версию Compose
+
+services:
+  # Сервис для вашего Python-приложения
+  app:
+    build: . # Указывает Docker Compose собрать образ из Dockerfile в текущем каталоге
+    command: python main.py
+    container_name: backend # Имя контейнера (опционально)
+#    ports:
+#      # Проброс порта вашего приложения (если это веб-сервер)
+#      # Замените 8000 на порт, который слушает ваше приложение
+#      - "8000:80" # <порт_на_хосте>:<порт_в_контейнере>
+    environment:
+      - WATCHFILES_FORCE_POLLING=true # Hot-update
+    depends_on:
+      db:
+        condition: service_healthy # Запускать 'app' только после того, как 'db' станет "здоровым"
+    volumes:
+      # Можно примонтировать код для разработки, чтобы изменения отражались без пересборки
+       - .:/app # Раскомментируйте для разработки
+    restart: unless-stopped # Политика перезапуска
+
+  # Сервис для базы данных PostgreSQL
+  db:
+    image: postgres:16-alpine # Используем официальный образ Postgres (alpine - легковесный)
+    container_name: postgres_db # Имя контейнера (опционально)
+    environment:
+      # Переменные для инициализации БД при первом запуске
+      POSTGRES_USER: root # Имя пользователя БД
+      POSTGRES_PASSWORD: hackpassword # Пароль пользователя БД
+      POSTGRES_DB: hack # Имя базы данных для создания
+      POSTGRES_INITDB_ARGS: "--data-checksums --encoding=UTF8 --locale=C"
+      TZ: "UTC"  # Устанавливаем часовой пояс для контейнера
+      PGTZ: "UTC"  # Устанавливаем часовой пояс для PostgreSQL
+    volumes:
+      # Создаем именованный том для сохранения данных БД между перезапусками контейнера
+      - postgres_data:/var/lib/postgresql/data
+    command: ["postgres", "-c", "timezone=UTC"]  # Явно указываем timezone
+    ports:
+      # Можно пробросить порт БД наружу для отладки (не обязательно для работы приложения)
+      - "5433:5432" # <порт_на_хосте>:<порт_в_контейнере>
+    healthcheck:
+        # Проверка состояния БД перед тем, как приложение попытается подключиться
+        test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 10s # Даем время на первый запуск
+    restart: unless-stopped # Политика перезапуска
+
+# Определяем именованный том
+volumes:
+  postgres_data:

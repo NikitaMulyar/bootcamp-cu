@@ -11,39 +11,53 @@ from telegram import Update
 from telegram.ext import (Application, MessageHandler, filters, CommandHandler, CallbackQueryHandler,
                           ConversationHandler, TypeHandler)
 
+from core.database.models import db_helper, Base
+from core.reg_class import RegClass
 from core.start_class import BotClass
 
 gc.enable()
 load_dotenv()
 
-logging.basicConfig(
-    filename='logs.log', filemode='a',
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING,
-    encoding='utf-8'
-)
-
-logger = logging.getLogger(__name__)
 os.environ['TZ'] = "Europe/Moscow"
 
 
+async def make_tables():
+    async with db_helper.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
 def main():
+    asyncio.gather(make_tables())
     application = (Application.builder().token(os.getenv("TELEGRAM_BOT_TOKEN")).connection_pool_size(2048).read_timeout(10)
                    .write_timeout(10).connect_timeout(10).pool_timeout(10).concurrent_updates(True)
                    .get_updates_connect_timeout(10).get_updates_connection_pool_size(10)
                    .get_updates_pool_timeout(10).get_updates_read_timeout(10)
                    .get_updates_write_timeout(10).build())
-
-    config_ex = BotClass()
-    ex_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', config_ex.start)],
+    register_class = RegClass()
+    reg_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', register_class.start)],
         states={
-            1: [CallbackQueryHandler(config_ex.get_request, pattern=r'(pp1|pp2|pp3|pp4)')],
-            2: [MessageHandler(filters.TEXT & ~filters.COMMAND, config_ex.process_query)],
+            register_class.state_email: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_class.get_email)],
+            register_class.state_fio: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_class.get_fio)],
+            register_class.state_experience: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_class.get_experience)],
+            register_class.state_speciality: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_class.get_speciality)],
+            register_class.state_place: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_class.get_place)]
         },
-        fallbacks=[CommandHandler('end', config_ex.end)]
+        fallbacks=[CommandHandler('end', register_class.end)]
     )
 
-    application.add_handlers(handlers={1: [ex_handler]})
+    botcl = BotClass()
+    get_advice = CallbackQueryHandler(botcl.get_advice, pattern=r'advice')
+    advice_audio_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(botcl.choose_audio, pattern=r'speech')],
+        states={
+            botcl.state_audio: [MessageHandler(filters.VOICE, botcl.get_audio)]
+        },
+        fallbacks=[CommandHandler('end', botcl.end)]
+    )
+
+    application.add_handlers(handlers={1: [reg_handler],
+                                       2: [get_advice],
+                                       3: [advice_audio_handler]})
 
     application.run_polling()
 
