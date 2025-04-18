@@ -48,7 +48,8 @@ def main():
     botcl = BotClass()
     get_advice = CallbackQueryHandler(botcl.get_advice, pattern=r'advice')
     advice_audio_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(botcl.choose_audio, pattern=r'speech')],
+        entry_points=[CallbackQueryHandler(botcl.choose_audio, pattern=r'speech'),
+                      CallbackQueryHandler(botcl.get_questions, pattern=r'questions')],
         states={
             botcl.state_audio: [MessageHandler(filters.VOICE, botcl.get_audio)]
         },

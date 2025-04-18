@@ -30,7 +30,7 @@ class BotClass:
             res = await get_ans_by_assist(user.experience, user.speciality, user.place)
             for i in range(0, len(res), 2000):
                 await context.bot.send_message(query.message.chat.id, res[i:i + 2000])
-            await context.bot.send_message('✅ Готово!', reply_markup=await self.menu())
+            await context.bot.send_message(query.message.chat.id, '✅ Готово!', reply_markup=await self.menu())
         except Exception as e:
             print(e)
             await query.edit_message_text(f'⚠️ К сожалению, не удалось обработать запрос',
@@ -41,7 +41,7 @@ class BotClass:
         query = update.callback_query
         await query.answer()
         await query.edit_message_text('Присылай аудиосообщение, чтобы я мог прослушать его и дать рекомендации '
-                                      'по ее улучшении')
+                                      'по ее улучшению')
         return self.state_audio
 
     async def get_audio(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -67,6 +67,31 @@ class BotClass:
 
         await session.close()
         return ConversationHandler.END
+
+    async def get_questions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        await query.edit_message_text('⏳ Идет обработка...')
+
+        session = await db_helper.get_session()
+        stmt = (select(User).where(User.id == query.from_user.id))
+        user = (await session.execute(stmt)).scalar_one_or_none()
+
+        try:
+            res = await get_text(f'Информация обо мне: опыт: {user.experience}, специальность: {user.experience}, '
+                                 f'место работы: {user.place}', None, questions=True)
+            for i in range(0, len(res), 2000):
+                await context.bot.send_message(query.message.chat.id, res[i:i + 2000])
+            await context.bot.send_message(query.message.chat.id, 'Присылай аудиосообщение, чтобы я мог прослушать его и дать рекомендации '
+                                          'по ее улучшению')
+        except Exception as e:
+            print(e)
+            await query.edit_message_text(f'⚠️ К сожалению, не удалось обработать запрос: {e}',
+                                            reply_markup=await self.menu())
+            await session.close()
+            return ConversationHandler.END
+        await session.close()
+        return self.state_audio
 
     async def end(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text('⚠️ Диалог прерван')
