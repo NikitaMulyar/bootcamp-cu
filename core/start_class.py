@@ -55,6 +55,7 @@ class BotClass:
         await file.download_to_drive(file_path)
         try:
             res = await get_stt(file_path)
+            await update.message.reply_text(res)
             advice = await get_text(res, f'опыт: {user.experience}, специальность: {user.experience},'
                                          f'место работы: {user.place}')
             for i in range(0, len(advice), 2000):

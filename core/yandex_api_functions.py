@@ -89,7 +89,7 @@ async def query(task_id):
             query_result = response.json()
             if query_result["code"] == 11000:
                 print('transcription result')
-                return query_result
+                return query_result['result']
             elif query_result["code"] == 11001:
                 print('waiting')
                 await asyncio.sleep(3)
