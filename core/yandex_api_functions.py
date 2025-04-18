@@ -129,7 +129,6 @@ async def get_text(user_prompt, data, update, questions=False):
         temperature=0.4,
         max_tokens=4000,
     )
-    await update.message.reply_text('отправлено')
     operation = model.run_deferred(messages)
 
     status = operation.get_status()
