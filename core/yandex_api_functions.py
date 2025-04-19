@@ -1,6 +1,7 @@
 import asyncio
 import aiohttp
 import os
+from mistralai import Mistral
 import requests
 
 from yandex_cloud_ml_sdk import YCloudML
@@ -33,7 +34,7 @@ async def create_assistant():
     return assistant.id
 
 
-async def get_ans_by_assist(exp, spec, place):
+async def get_ans_by_assist(user_prompt, exp, spec, place, about):
     assistant_id = await create_assistant()
     sdk = YCloudML(
         folder_id=os.getenv("YANDEX_FOLDER_ID"),
@@ -42,15 +43,14 @@ async def get_ans_by_assist(exp, spec, place):
     assistant = sdk.assistants.get(assistant_id)
 
     text_index_thread = sdk.threads.create()
-    text_index_thread.write(f'Дай советы по тому, как улучшить преподавание уроков. Приведи примеры (удачные и неудачные).'
-                            f' Информация о пользователе: опыт: {exp}, специальность: {spec}, место работы: {place}')
-    print('отправлено')
+    text_index_thread.write(f'{user_prompt}\n\n'
+                            f'Информация о пользователе: опыт: {exp}, специальность: {spec}, место работы: {place}.\n'
+                            f'О пользователе: {about}')
     run = assistant.run(text_index_thread)
 
     res = ''
     result = run.wait().message
     for part in result.parts:
-        print(part)
         res += str(part)
     return res
 
@@ -61,12 +61,10 @@ async def create(file_path):
     create_url = "https://api.speechflow.io/asr/file/v1/create"
     create_url += "?lang=" + 'ru'
     files['file'] = open(file_path, "rb")
-    # TODO: сделать STT асинхр.
-    # async with aiohttp.ClientSession() as session:
-    #     response = await session.post(create_url, headers=headers, files=files)
-    response = requests.post(create_url, headers=headers, files=files)
-    if response.status_code == 200:
-        create_result = response.json()
+    async with aiohttp.ClientSession() as session:
+        response = await session.post(create_url, headers=headers, data=files)
+    if response.status == 200:
+        create_result = await response.json()
         print(create_result)
         if create_result["code"] == 10000:
             task_id = create_result["taskId"]
@@ -75,7 +73,7 @@ async def create(file_path):
             print(create_result["msg"])
             task_id = ""
     else:
-        print('create request failed: ', response.status_code)
+        print('create request failed: ', response.status)
         task_id = ""
     return task_id
 
@@ -85,9 +83,10 @@ async def query(task_id):
     query_url = "https://api.speechflow.io/asr/file/v1/query?taskId=" + task_id + "&resultType=4"
     print('querying transcription result')
     while True:
-        response = requests.get(query_url, headers=headers)
-        if response.status_code == 200:
-            query_result = response.json()
+        async with aiohttp.ClientSession() as session:
+            response = await session.get(query_url, headers=headers)
+        if response.status == 200:
+            query_result = await response.json()
             if query_result["code"] == 11000:
                 print('transcription result')
                 return query_result['result']
@@ -99,7 +98,7 @@ async def query(task_id):
                 print("transcription error")
                 return query_result['msg']
         else:
-            print('query request failed: ', response.status_code)
+            print('query request failed: ', response.status)
 
 
 async def get_stt(file_path):
@@ -109,35 +108,22 @@ async def get_stt(file_path):
     return 'ошибка'
 
 
-async def get_text(user_prompt, data, questions=False):
-    system_prompt = ('Ты - профессиональный спикер. Посмотри данный текст и дай рекомендации по его улучшению. '
-                     'Пользователь - эскперт IT индустрии, но хочет начать преподавать. Ему надо дать советы по '
-                     f'soft-skills и психологические советы. Информация о пользователе: {data}. Обязательно опирайся на текст'
-                     f'пользователя!')
+async def get_text(user_prompt, exp, spec, place, about, questions=False):
+    agent_id = os.getenv('MISTRAL_ADVICER_API_KEY')
     if questions:
-        system_prompt = ('Представь, что ты - студент. Задай трудные для преподавателя вопросы, '
-                         'над которыми нужно подумать и которые помогут в тренировке речи преподавателя.'
-                         'ТЫ - СТУДЕНТ!! Задвай вопросы от лица студента!')
-    messages = [
-        {'role': 'system', 'text': system_prompt},
-        {'role': 'user', 'text': user_prompt},
-    ]
+        agent_id = os.getenv('MISTRAL_QUESTIONS_API_KEY')
 
-    sdk = YCloudML(
-        folder_id=os.getenv("YANDEX_FOLDER_ID"),
-        auth=os.getenv("YANDEX_API_KEY"),
+    client = Mistral(api_key=os.getenv('MISTRAL_API_KEY'))
+    chat_response = await client.agents.complete_async(
+        agent_id=agent_id,
+        messages=[
+            {
+                "role": "user",
+                "content": f'{user_prompt}\n\n'
+                           f'Информация о пользователе: опыт: {exp}, специальность: {spec}, место работы: {place}.\n'
+                           f'О пользователе: {about}',
+            },
+        ],
     )
-    model = sdk.models.completions('yandexgpt-lite')
-    model.configure(
-        temperature=0.4,
-        max_tokens=4000,
-    )
-    operation = model.run_deferred(messages)
-
-    status = operation.get_status()
-    while status.is_running:
-        await asyncio.sleep(5)
-        status = operation.get_status()
-
-    result = operation.get_result()
-    return result.text
+    response = chat_response.choices[0].message.content
+    return response

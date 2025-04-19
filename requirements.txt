@@ -49,3 +49,4 @@ yarl==1.18.3
 email-validator==2.2.0
 sqlalchemy==2.0.40
 asyncpg==0.30.0
+mistralai==1.7.0
