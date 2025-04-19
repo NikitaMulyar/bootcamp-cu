@@ -13,7 +13,10 @@ class DatabaseHelper:
             echo=echo,
         )
         self.session_factory = async_sessionmaker(
-            bind=self.engine, autocommit=False, autoflush=False, expire_on_commit=False
+            bind=self.engine,
+            autocommit=False,
+            autoflush=False,
+            expire_on_commit=False,
         )
 
     async def get_session(self) -> AsyncSession:

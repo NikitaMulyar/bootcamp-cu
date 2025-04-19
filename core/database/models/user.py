@@ -9,3 +9,4 @@ class User(Base):
     experience: Mapped[str] = mapped_column(String)
     speciality: Mapped[str] = mapped_column(String)
     place: Mapped[str] = mapped_column(String)
+    essay: Mapped[str] = mapped_column(String, nullable=True, default=None)
