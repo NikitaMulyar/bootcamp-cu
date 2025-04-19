@@ -13,6 +13,7 @@ from telegram.ext import ConversationHandler, ContextTypes
 class BotClass:
     state_audio = 1
     state_audio_essay = 2
+    state_which_advice = 3
 
     async def menu(self):
         classes = [
@@ -32,37 +33,36 @@ class BotClass:
         ]
         return InlineKeyboardMarkup(classes)
 
-    async def get_advice(
+    async def get_text_advice(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         query = update.callback_query
         await query.answer()
-        await query.edit_message_text("⏳ Идет обработка...")
+        await query.edit_message_text("Какой именно совет ты хочешь получить?")
+        return self.state_which_advice
+
+    async def get_advice(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        await update.message.reply_text("⏳ Идет обработка...")
 
         session = await db_helper.get_session()
-        stmt = select(User).where(User.id == query.from_user.id)
+        stmt = select(User).where(User.id == update.message.from_user.id)
         user = (await session.execute(stmt)).scalar_one_or_none()
 
         try:
-            res = await get_ans_by_assist(
-                user.experience, user.speciality, user.place
-            )
+            res = await get_ans_by_assist(update.message.text,
+                                          user.experience, user.speciality, user.place,
+                                          user.essay)
             for i in range(0, len(res), 2000):
-                await context.bot.send_message(
-                    query.message.chat.id, res[i : i + 2000]
-                )
-            await context.bot.send_message(
-                query.message.chat.id,
-                "✅ Готово!",
-                reply_markup=await self.menu(),
-            )
+                await update.message.reply_text(res[i : i + 2000])
+            await update.message.reply_text("✅ Готово!", reply_markup=await self.menu())
         except Exception as e:
             print(e)
-            await query.edit_message_text(
-                f"⚠️ К сожалению, не удалось обработать запрос",
-                reply_markup=await self.menu(),
-            )
+            await update.message.reply_text(f"⚠️ К сожалению, не удалось обработать запрос",
+                                            reply_markup=await self.menu())
         await session.close()
+        return ConversationHandler.END
 
     async def choose_audio(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -71,7 +71,7 @@ class BotClass:
         await query.answer()
         await query.edit_message_text(
             "Присылай аудиосообщение, чтобы я мог прослушать его и дать рекомендации "
-            "по ее улучшению"
+            "по улучшению твоей речи"
         )
         return self.state_audio
 
@@ -89,9 +89,7 @@ class BotClass:
         try:
             res = await get_stt(file_path)
             advice = await get_text(
-                res,
-                f"опыт: {user.experience}, специальность: {user.experience},"
-                f"место работы: {user.place}",
+                res, user.experience, user.speciality, user.place, user.essay
             )
             for i in range(0, len(advice), 2000):
                 await update.message.reply_text(advice[i : i + 2000])
@@ -101,7 +99,7 @@ class BotClass:
         except Exception as e:
             print(e)
             await update.message.reply_text(
-                f"⚠️ К сожалению, не удалось обработать запрос: {e}",
+                f"⚠️ К сожалению, не удалось обработать запрос",
                 reply_markup=await self.menu(),
             )
 
@@ -121,10 +119,8 @@ class BotClass:
 
         try:
             res = await get_text(
-                f"Информация обо мне: опыт: {user.experience}, специальность: {user.experience}, "
-                f"место работы: {user.place}",
-                None,
-                questions=True,
+                '', user.experience, user.speciality, user.place, user.essay,
+                questions=True
             )
             for i in range(0, len(res), 2000):
                 await context.bot.send_message(
@@ -138,7 +134,7 @@ class BotClass:
         except Exception as e:
             print(e)
             await query.edit_message_text(
-                f"⚠️ К сожалению, не удалось обработать запрос: {e}",
+                f"⚠️ К сожалению, не удалось обработать запрос",
                 reply_markup=await self.menu(),
             )
             await session.close()
@@ -170,9 +166,7 @@ class BotClass:
         await file.download_to_drive(file_path)
         try:
             res = await get_stt(file_path)
-            # save res to db
             user.essay = res
-            session.add(user)
             await session.commit()
             await update.message.reply_text(
                 "✅ Готово! Теперь я буду давать тебе более персонализированные советы.",
@@ -181,7 +175,7 @@ class BotClass:
         except Exception as e:
             print(e)
             await update.message.reply_text(
-                f"⚠️ К сожалению, не удалось обработать запрос: {e}",
+                f"⚠️ К сожалению, не удалось обработать запрос",
                 reply_markup=await self.menu(),
             )
 

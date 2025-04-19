@@ -81,18 +81,21 @@ def main():
     )
 
     botcl = BotClass()
-    get_advice = CallbackQueryHandler(botcl.get_advice, pattern=r"advice")
     advice_audio_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(botcl.choose_audio, pattern=r"speech"),
             CallbackQueryHandler(botcl.get_questions, pattern=r"questions"),
             CallbackQueryHandler(botcl.get_essay, pattern=r"essay"),
+            CallbackQueryHandler(botcl.get_text_advice, pattern=r"advice")
         ],
         states={
+            botcl.state_which_advice: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, botcl.get_advice)
+            ],
             botcl.state_audio: [
                 MessageHandler(filters.VOICE, botcl.get_audio)
             ],
-            botcl.status_audio_essay: [
+            botcl.state_audio_essay: [
                 MessageHandler(filters.VOICE, botcl.save_essay)
             ],
         },
@@ -100,7 +103,7 @@ def main():
     )
 
     application.add_handlers(
-        handlers={1: [reg_handler], 2: [get_advice], 3: [advice_audio_handler]}
+        handlers={1: [reg_handler], 2: [advice_audio_handler]}
     )
 
     application.run_polling()
