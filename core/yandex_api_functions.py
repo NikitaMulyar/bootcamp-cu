@@ -112,7 +112,7 @@ async def get_stt(file_path):
 async def get_text(user_prompt, exp, spec, place, about, questions=False):
     agent_id = os.getenv('MISTRAL_ADVICER_API_KEY')
     if questions:
-        agent_id = os.getenv('MISTRAL_QUESTIONS_API_KEY')
+        agent_id = os.getenv('MISTRAL_STUDENT_API_KEY')
 
     client = Mistral(api_key=os.getenv('MISTRAL_API_KEY'))
     chat_response = await client.agents.complete_async(
