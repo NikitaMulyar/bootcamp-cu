@@ -62,7 +62,7 @@ async def create(file_path):
     create_url = "https://api.speechflow.io/asr/file/v1/create"
     create_url += "?lang=" + 'ru'
     files['file'] = open(file_path, "rb")
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=100) as session:
         response = await session.post(create_url, headers=headers, data=files)
     if response.status == 200:
         create_result = await response.json()
@@ -84,7 +84,7 @@ async def query(task_id):
     query_url = "https://api.speechflow.io/asr/file/v1/query?taskId=" + task_id + "&resultType=4"
     print('querying transcription result')
     while True:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=100) as session:
             response = await session.get(query_url, headers=headers)
         if response.status == 200:
             query_result = await response.json()
