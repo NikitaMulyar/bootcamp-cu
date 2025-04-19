@@ -92,7 +92,7 @@ def main():
             botcl.state_audio: [
                 MessageHandler(filters.VOICE, botcl.get_audio)
             ],
-            botcl.status_audio_essay: [
+            botcl.state_audio_essay: [
                 MessageHandler(filters.VOICE, botcl.save_essay)
             ],
         },
